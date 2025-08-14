@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Horario Semanal Personal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
         .hour-cell {
             transition: all 0.2s ease;
@@ -82,7 +85,6 @@
             const clearBtn = document.getElementById('clearBtn');
             const downloadBtn = document.getElementById('downloadBtn');
             
-            // Generar filas de horas
             function generateTimeRows() {
                 let rows = '';
                 
@@ -104,7 +106,6 @@
                 loadSchedule();
             }
             
-            // Generar celdas para cada día
             function generateDayCells(hour) {
                 let cells = '';
                 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -122,7 +123,6 @@
                 return cells;
             }
             
-            // Hacer celdas editables
             function makeCellsEditable() {
                 const cells = document.querySelectorAll('.hour-cell');
                 
@@ -145,7 +145,6 @@
                 });
             }
             
-            // Guardar actividad
             function saveActivity(cell) {
                 const day = cell.getAttribute('data-day');
                 const hour = cell.getAttribute('data-hour');
@@ -158,7 +157,6 @@
                 
                 localStorage.setItem('weeklySchedule', JSON.stringify(schedule));
                 
-                // Resaltar celdas con contenido
                 if (activity) {
                     cell.classList.add('bg-green-50');
                 } else {
@@ -166,7 +164,6 @@
                 }
             }
             
-            // Cargar horario guardado
             function loadSchedule() {
                 const schedule = JSON.parse(localStorage.getItem('weeklySchedule') || '{}');
                 
@@ -183,7 +180,6 @@
                 });
             }
             
-            // Limpiar todo
             function clearAll() {
                 if (confirm('¿Estás seguro de que deseas eliminar todo tu horario? Esto no se puede deshacer.')) {
                     localStorage.removeItem('weeklySchedule');
@@ -194,25 +190,23 @@
                 }
             }
             
-            // Descargar PDF
             function downloadPDF() {
                 const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const table = document.getElementById('schedule-table');
+                const doc = new jsPDF({ orientation: 'landscape' });
 
-                // Agregar título
                 doc.setFontSize(20);
-                doc.text('Mi Horario Semanal', 14, 20);
-                doc.setFontSize(12);
+                doc.text('Mi Horario Semanal', 14, 15);
 
-                // Agregar tabla
-                doc.autoTable({ html: table, startY: 30 });
+                doc.autoTable({
+                    html: '#schedule-table',
+                    startY: 25,
+                    theme: 'grid',
+                    styles: { fontSize: 8, cellPadding: 2 }
+                });
 
-                // Descargar el PDF
                 doc.save('horario_semanal.pdf');
             }
 
-            // Event listeners
             saveBtn.addEventListener('click', () => {
                 const cells = document.querySelectorAll('.hour-cell textarea');
                 cells.forEach(textarea => {
@@ -226,10 +220,8 @@
             clearBtn.addEventListener('click', clearAll);
             downloadBtn.addEventListener('click', downloadPDF);
             
-            // Generar la tabla al cargar
             generateTimeRows();
             
-            // Guardar cuando se presiona Enter en textarea
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' && e.target.tagName === 'TEXTAREA') {
                     e.preventDefault();
@@ -237,7 +229,6 @@
                     cell.textContent = e.target.value;
                     saveActivity(cell);
                     
-                    // Mover foco a la siguiente celda
                     const currentRow = cell.closest('tr');
                     const currentCell = cell.closest('td');
                     const nextCell = currentCell.nextElementSibling;

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horario Semanal Personal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .hour-cell {
+            transition: all 0.2s ease;
+        }
+        .hour-cell:focus {
+            background-color: #f0fdf4;
+            outline: 2px solid #86efac;
+        }
+        .print-button:hover {
+            transform: translateY(-2px);
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-green-800 mb-2">Mi Horario Semanal</h1>
+            <p class="text-gray-600">Organiza tus actividades de 6 AM a 12 PM</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full" id="schedule-table">
+                    <thead>
+                        <tr class="bg-green-700 text-white">
+                            <th class="py-3 px-4 text-left w-24">Hora</th>
+                            <th class="py-3 px-4 border-l border-green-600">Lunes</th>
+                            <th class="py-3 px-4 border-l border-green-600">Martes</th>
+                            <th class="py-3 px-4 border-l border-green-600">Miércoles</th>
+                            <th class="py-3 px-4 border-l border-green-600">Jueves</th>
+                            <th class="py-3 px-4 border-l border-green-600">Viernes</th>
+                            <th class="py-3 px-4 border-l border-green-600">Sábado</th>
+                            <th class="py-3 px-4 border-l border-green-600">Domingo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-body">
+                        <!-- Las filas de horas se generarán con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-center space-x-4 no-print">
+            <button id="saveBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                Guardar Horario
+            </button>
+            <button id="clearBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg transition">
+                Limpiar Todo
+            </button>
+            <button id="downloadBtn" class="print-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                Descargar PDF
+            </button>
+        </div>
+
+        <div class="mt-8 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 no-print">
+            <p class="font-semibold">📝 Consejos:</p>
+            <ul class="list-disc pl-5 mt-1 space-y-1">
+                <li>Haz clic en cualquier celda para editar tu actividad</li>
+                <li>Presiona "Enter" o haz clic fuera para guardar los cambios</li>
+                <li>Recuerda guardar tus cambios antes de salir</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scheduleBody = document.getElementById('schedule-body');
+            const saveBtn = document.getElementById('saveBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            // Generar filas de horas
+            function generateTimeRows() {
+                let rows = '';
+                
+                for (let hour = 6; hour <= 24; hour++) {
+                    const displayHour = hour <= 12 ? hour : hour - 12;
+                    const ampm = hour < 12 ? 'AM' : 'PM';
+                    const timeLabel = `${displayHour}:00 ${ampm}`;
+                    
+                    rows += `
+                        <tr class="border-t border-gray-200">
+                            <td class="py-2 px-4 font-medium bg-gray-50 text-gray-700">${timeLabel}</td>
+                            ${generateDayCells(hour)}
+                        </tr>
+                    `;
+                }
+                
+                scheduleBody.innerHTML = rows;
+                makeCellsEditable();
+                loadSchedule();
+            }
+            
+            // Generar celdas para cada día
+            function generateDayCells(hour) {
+                let cells = '';
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                
+                days.forEach(day => {
+                    cells += `
+                        <td class="py-2 px-4 border-l border-gray-200">
+                            <div class="hour-cell min-h-10 p-1 cursor-pointer hover:bg-gray-100" 
+                                 data-day="${day}" 
+                                 data-hour="${hour}"></div>
+                        </td>
+                    `;
+                });
+                
+                return cells;
+            }
+            
+            // Hacer celdas editables
+            function makeCellsEditable() {
+                const cells = document.querySelectorAll('.hour-cell');
+                
+                cells.forEach(cell => {
+                    cell.addEventListener('click', function() {
+                        const text = this.textContent.trim();
+                        this.innerHTML = `<textarea class="w-full h-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-green-300" rows="2">${text}</textarea>`;
+                        this.querySelector('textarea').focus();
+                    });
+                    
+                    cell.addEventListener('focusout', function(e) {
+                        if (e.relatedTarget && e.relatedTarget.tagName === 'TEXTAREA') return;
+                        
+                        const textarea = this.querySelector('textarea');
+                        if (textarea) {
+                            this.textContent = textarea.value;
+                            saveActivity(this);
+                        }
+                    });
+                });
+            }
+            
+            // Guardar actividad
+            function saveActivity(cell) {
+                const day = cell.getAttribute('data-day');
+                const hour = cell.getAttribute('data-hour');
+                const activity = cell.textContent.trim();
+                
+                let schedule = JSON.parse(localStorage.getItem('weeklySchedule') || '{}');
+                
+                if (!schedule[day]) schedule[day] = {};
+                schedule[day][hour] = activity;
+                
+                localStorage.setItem('weeklySchedule', JSON.stringify(schedule));
+                
+                // Resaltar celdas con contenido
+                if (activity) {
+                    cell.classList.add('bg-green-50');
+                } else {
+                    cell.classList.remove('bg-green-50');
+                }
+            }
+            
+            // Cargar horario guardado
+            function loadSchedule() {
+                const schedule = JSON.parse(localStorage.getItem('weeklySchedule') || '{}');
+                
+                Object.keys(schedule).forEach(day => {
+                    Object.keys(schedule[day]).forEach(hour => {
+                        const cell = document.querySelector(`.hour-cell[data-day="${day}"][data-hour="${hour}"]`);
+                        if (cell) {
+                            cell.textContent = schedule[day][hour];
+                            if (schedule[day][hour]) {
+                                cell.classList.add('bg-green-50');
+                            }
+                        }
+                    });
+                });
+            }
+            
+            // Limpiar todo
+            function clearAll() {
+                if (confirm('¿Estás seguro de que deseas eliminar todo tu horario? Esto no se puede deshacer.')) {
+                    localStorage.removeItem('weeklySchedule');
+                    document.querySelectorAll('.hour-cell').forEach(cell => {
+                        cell.textContent = '';
+                        cell.classList.remove('bg-green-50');
+                    });
+                }
+            }
+            
+            // Descargar PDF
+            function downloadPDF() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const table = document.getElementById('schedule-table');
+
+                // Agregar título
+                doc.setFontSize(20);
+                doc.text('Mi Horario Semanal', 14, 20);
+                doc.setFontSize(12);
+
+                // Agregar tabla
+                doc.autoTable({ html: table, startY: 30 });
+
+                // Descargar el PDF
+                doc.save('horario_semanal.pdf');
+            }
+
+            // Event listeners
+            saveBtn.addEventListener('click', () => {
+                const cells = document.querySelectorAll('.hour-cell textarea');
+                cells.forEach(textarea => {
+                    const cell = textarea.parentElement;
+                    cell.textContent = textarea.value;
+                    saveActivity(cell);
+                });
+                alert('Horario guardado exitosamente!');
+            });
+            
+            clearBtn.addEventListener('click', clearAll);
+            downloadBtn.addEventListener('click', downloadPDF);
+            
+            // Generar la tabla al cargar
+            generateTimeRows();
+            
+            // Guardar cuando se presiona Enter en textarea
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.target.tagName === 'TEXTAREA') {
+                    e.preventDefault();
+                    const cell = e.target.parentElement;
+                    cell.textContent = e.target.value;
+                    saveActivity(cell);
+                    
+                    // Mover foco a la siguiente celda
+                    const currentRow = cell.closest('tr');
+                    const currentCell = cell.closest('td');
+                    const nextCell = currentCell.nextElementSibling;
+                    
+                    if (nextCell) {
+                        nextCell.querySelector('.hour-cell')?.click();
+                    } else {
+                        const nextRow = currentRow.nextElementSibling;
+                        if (nextRow) {
+                            nextRow.querySelector('td:first-child + td .hour-cell')?.click();
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
